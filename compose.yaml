@@ -1,0 +1,53 @@
+services:
+  blackbox:
+    build: .
+    restart: unless-stopped
+    environment:
+      BLACKBOX_DEPLOY_MODE: ${BLACKBOX_DEPLOY_MODE:-public-demo}
+      BLACKBOX_BASIC_USER: ${BLACKBOX_BASIC_USER:-}
+      BLACKBOX_BASIC_PASSWORD: ${BLACKBOX_BASIC_PASSWORD:-}
+      BLACKBOX_PUBLIC_HOST: ${BLACKBOX_PUBLIC_HOST:?Set domain hostname}
+      BLACKBOX_CLOUD_PROVIDER: ${BLACKBOX_CLOUD_PROVIDER:-}
+      BLACKBOX_CLOUD_API_KEY: ${BLACKBOX_CLOUD_API_KEY:-}
+      BLACKBOX_CLOUD_MODEL: ${BLACKBOX_CLOUD_MODEL:-}
+      BLACKBOX_MAX_UPLOAD_MB: ${BLACKBOX_MAX_UPLOAD_MB:-20}
+      BLACKBOX_MAX_FRAMES: ${BLACKBOX_MAX_FRAMES:-100000}
+      BLACKBOX_MAX_CASES_PER_USER: ${BLACKBOX_MAX_CASES_PER_USER:-12}
+      BLACKBOX_MAX_CAPTURES_PER_CASE: ${BLACKBOX_MAX_CAPTURES_PER_CASE:-20}
+      BLACKBOX_MAX_USER_DISK_MB: ${BLACKBOX_MAX_USER_DISK_MB:-500}
+      BLACKBOX_MAX_TOTAL_DISK_MB: ${BLACKBOX_MAX_TOTAL_DISK_MB:-2048}
+      BLACKBOX_WORKER_TIMEOUT_SECONDS: ${BLACKBOX_WORKER_TIMEOUT_SECONDS:-120}
+      BLACKBOX_WORKER_MEMORY_MB: ${BLACKBOX_WORKER_MEMORY_MB:-768}
+      BLACKBOX_WORKER_CPU_SECONDS: ${BLACKBOX_WORKER_CPU_SECONDS:-90}
+    volumes:
+      - blackbox_data:/var/lib/blackbox
+    networks: [internal]
+    mem_limit: 1g
+    cpus: 1.5
+    pids_limit: 128
+    ulimits:
+      nofile:
+        soft: 2048
+        hard: 4096
+    read_only: true
+    tmpfs: [/tmp:size=64m,mode=1777]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  caddy:
+    image: caddy:2
+    environment:
+      BLACKBOX_PUBLIC_HOST: ${BLACKBOX_PUBLIC_HOST:?Set domain hostname}
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [blackbox]
+    networks: [internal]
+networks:
+  internal:
+volumes:
+  blackbox_data:
+  caddy_data:
+  caddy_config:

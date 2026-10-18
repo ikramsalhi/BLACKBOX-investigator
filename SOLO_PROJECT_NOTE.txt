@@ -1,0 +1,6 @@
+BLACKBOX v1.7 TRACE — Thirduni solo project
+Creator: Ikram Salhi
+Repository: https://github.com/ikramsalhi/BLACKBOX-investigator
+Detection today: deterministic rules. ML is planned but not integrated.
+Captures distributed here: synthetic demo scenarios only.
+Optional multi-pattern training PCAP: generate locally with samples/training/generate_training_pcap.py

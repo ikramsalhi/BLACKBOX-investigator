@@ -1,0 +1,30 @@
+# Never publish collected evidence or database files
+*.pcap
+*.pcapng
+*.cap
+# Allow only specifically reviewed educational fixture inputs.
+# Only explicitly synthetic generated PCAP fixtures are permitted in this public repository.
+!samples/demo_pcaps/*.pcap
+!tests/fixtures/synthetic_packet_fixture.pcap
+!tests/fixtures/legacy_synthetic_cases/*.pcap
+*.sqlite
+*.sqlite3
+*.db
+*.mdb
+*.log
+.local_test/
+.env
+.env.*
+*.key
+*.pem
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+
+!.env.example
+!deploy.env.example
+
+# Controlled training capture that is safe to redistribute
+!samples/training/SYNTHETIC_multi_pattern_training.pcap

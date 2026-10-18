@@ -1,0 +1,23 @@
+{
+  "type": "synthetic_training_capture",
+  "origin": "Generated in a controlled training script, not live network traffic",
+  "note": "Rule hits are investigation leads, not proof of real incidents",
+  "source_manifest": {
+    "filename": "BLACKBOX_Suspicious_Training_Capture.pcap",
+    "sha256": "444d66a0a6f3fc76e83edf5396d6eba02b936d30b504fbe01578e76fd512035e",
+    "frames": 7861,
+    "bytes": 8930930,
+    "frame_types": {
+      "TCP port sweep + SYN burst": 55,
+      "TCP reset burst": 42,
+      "Long DNS query + NXDOMAIN": 20,
+      "DNS NXDOMAIN response": 20,
+      "ARP identity conflict": 10,
+      "Legacy FTP service": 7,
+      "Public admin port": 7,
+      "Outbound traffic volume": 7700
+    },
+    "synthetic": true,
+    "does_not_contact_any_device": true
+  }
+}

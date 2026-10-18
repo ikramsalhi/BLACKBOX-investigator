@@ -1,0 +1,13 @@
+BLACKBOX v1.7 TRACE — PUBLISH TO GITHUB (WINDOWS)
+
+Repo: https://github.com/ikramsalhi/BLACKBOX-investigator
+
+1) Install Git for Windows and sign in when prompted.
+2) Extract this ZIP.
+3) In the extracted folder, double-click push_to_github_windows.bat.
+4) Inspect the files and confirm the push when asked.
+5) Visit the repository and check GitHub Actions.
+
+If Git is missing, install from https://git-scm.com/downloads/win .
+The script clones your existing repository and preserves Git history.
+Never place .env, token files, private captures, or unreviewed PCAPs in the repo.

@@ -1,0 +1,6 @@
+fastapi>=0.110,<1.0
+uvicorn>=0.27,<1.0
+python-multipart>=0.0.9,<1.0
+
+# Used by bundled demo seeder and local validation runner
+httpx>=0.27,<1.0

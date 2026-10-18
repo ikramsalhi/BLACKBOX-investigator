@@ -1,0 +1,12 @@
+{$BLACKBOX_PUBLIC_HOST:localhost} {
+  encode zstd gzip
+  request_body {
+    max_size 25MB
+  }
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+  }
+  reverse_proxy blackbox:8000
+}
