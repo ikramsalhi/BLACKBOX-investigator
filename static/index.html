@@ -10,13 +10,15 @@
 <link rel="stylesheet" href="/assets/obsidian.css">
 <link rel="stylesheet" href="/assets/release.css">
 <link rel="stylesheet" href="/assets/trace.css">
+<link rel="stylesheet" href="/assets/blackbox_v18.css">
 </head><body>
 <div id="app">
  <aside class="sidebar">
   <div class="brand"><div class="brand-symbol"><img src="/assets/blackbox-cube-small.png" alt="BLACKBOX black cube icon"/></div><div><b>BLACKBOX</b><small>NETWORK INCIDENT<br>INVESTIGATOR</small></div></div>
-  <div class="sidebar-edition"><span class="edition-beacon"></span> EVIDENCE-LED INVESTIGATION <span class="edition-id">V 1.7</span></div>
+  <div class="sidebar-edition"><span class="edition-beacon"></span> EVIDENCE-LED INVESTIGATION <span class="edition-id">V 1.8</span></div>
   <div class="side-caption">INVESTIGATION <span>5 STEPS</span></div>
   <nav id="navigation" aria-label="Application views">
+   <button class="nav-link" data-page="library"><i data-ico="capture"></i> Saved investigations <span class="nav-end">↗</span></button>
    <button class="nav-link active" data-page="overview"><i data-ico="overview"></i> Overview <span class="nav-end">01</span></button>
    <button class="nav-link" data-page="captures"><i data-ico="capture"></i> Evidence vault <span class="nav-end">02</span></button>
    <button class="nav-link" data-page="findings"><i data-ico="target"></i> Findings <span class="nav-count" id="findingsCount">0</span></button>
@@ -24,18 +26,19 @@
    <button class="nav-link" data-page="assistant"><i data-ico="chat"></i> Investigator <span class="nav-end">04</span></button>
    <button class="nav-link" data-page="report"><i data-ico="document"></i> Report <span class="nav-end">05</span></button>
    <details class="advanced-tools"><summary>More tools <span>⌄</span></summary>
+    <button class="nav-link" data-page="ml"><i data-ico="activity"></i> ML anomaly screening</button>
     <button class="nav-link" data-page="traffic"><i data-ico="activity"></i> Packet explorer</button>
     <button class="nav-link" data-page="replay"><i data-ico="activity"></i> Incident replay</button>
    </details>
   </nav>
-  <div class="side-bottom"><div class="sidebar-context"><span>CASE CONTEXT</span><b id="sidebarCase">No case selected</b><small id="sidebarFrames">Select evidence to begin</small></div><button id="helpSide" class="side-guide-btn" type="button">◎ &nbsp; Guided walkthrough <span>↗</span></button><div class="data-shield"><span class="pulse-dot"></span> <span id="privacyMode">EVIDENCE-FIRST ANALYSIS</span></div><p>Case observations are leads, not proof. Cloud AI only receives selected case metadata when enabled.</p><div class="side-foot">BLACKBOX 1.7 <span>THIRDUNI · 2026</span></div></div>
+  <div class="side-bottom"><div class="sidebar-context"><span>CASE CONTEXT</span><b id="sidebarCase">No case selected</b><small id="sidebarFrames">Select evidence to begin</small></div><button id="helpSide" class="side-guide-btn" type="button">◎ &nbsp; Guided walkthrough <span>↗</span></button><div class="data-shield"><span class="pulse-dot"></span> <span id="privacyMode">EVIDENCE-FIRST ANALYSIS</span></div><p>Case observations are leads, not proof. Cloud AI only receives selected case metadata when enabled.</p><div class="side-foot">BLACKBOX 1.8 <span>THIRDUNI · 2026</span></div></div>
  </aside>
  <main class="workarea">
    <header class="topbar"><div class="top-left"><span class="top-label">CASE WORKSPACE</span><span class="sep">/</span><div class="case-select-wrap"><select id="caseSelect" aria-label="Select investigation case"><option value="">No case selected</option></select><button id="newCaseBtn" title="Create case">+</button></div></div>
    <div class="top-right"><button class="small-btn demo-top-btn" id="demoTop" type="button">▣ &nbsp; Open demo investigations</button><button class="guide-top-btn" id="helpTop" type="button" aria-label="Open application guide">? <span>How it works</span></button><span class="status-pill" id="modePill"><span class="pulse-dot"></span> ENGINE ONLINE</span><button class="small-btn" id="importTop">＋ Import evidence</button></div></header>
    <div id="notifications" role="status" aria-live="polite"></div>
    <div id="page" class="page"></div>
-   <footer class="workspace-footer">BLACKBOX · Evidence-first network investigation <span>Human-reviewed conclusions · Version 1.7</span></footer>
+   <footer class="workspace-footer">BLACKBOX · Evidence-first network investigation <span>Human-reviewed conclusions · Version 1.8</span></footer>
  </main>
 </div>
 <div id="modalLayer" class="modal-layer hidden"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-top"><b id="modalTitle">Create an investigation</b><button id="closeModal" aria-label="Close dialog">×</button></div><form id="caseForm"><label>CASE NAME<input id="caseName" required maxlength="120" placeholder="e.g. Office DNS anomalies — October"></label><label>DESCRIPTION (OPTIONAL)<textarea id="caseDescription" maxlength="1000" rows="3" placeholder="Scope, suspected incident, source of capture…"></textarea></label><div class="modal-actions"><button type="button" class="ghost-btn" id="cancelModal">Cancel</button><button type="submit" class="primary-btn">Create case</button></div></form></div></div>
@@ -44,13 +47,13 @@
  <div class="guide-header"><div><div class="eyebrow">OPERATOR HANDBOOK</div><h2 id="guideTitle">Your mission control.</h2></div><button id="closeGuide" class="guide-close" type="button" aria-label="Close guide">×</button></div>
  <p class="guide-intro">BLACKBOX transforms packet-capture metadata into explainable investigation leads. It is not an automatic security verdict.</p>
  <div class="guide-steps">
-  <button type="button" data-guide-page="captures"><span>01</span><b>Import evidence</b><small>Start a case; upload PCAP or PCAPNG</small></button>
+  <button type="button" data-guide-page="captures"><span>01</span><b>Import evidence</b><small>Start a case; upload PCAP or PCAPNG (saved locally)</small></button>
   <button type="button" data-guide-page="overview"><span>02</span><b>Understand the story</b><small>Observe traffic volume and protocol mix</small></button>
   <button type="button" data-guide-page="investigation"><span>03</span><b>Map the relationships</b><small>Investigate observed host connections</small></button>
   <button type="button" data-guide-page="replay"><span>04</span><b>Replay the evidence</b><small>Watch the captured relationships evolve over time</small></button>
   <button type="button" data-guide-page="findings"><span>05</span><b>Review evidence</b><small>Challenge possible explanations and inspect packet references</small></button>
   <button type="button" data-guide-page="assistant"><span>06</span><b>Ask BLACKBOX Copilot</b><small>Get explanations in plain language or technical depth</small></button>
-  <button type="button" data-guide-page="report"><span>07</span><b>Export your report</b><small>Document hashes, findings, and limitations</small></button>
+  <button type="button" data-guide-page="report"><span>07</span><b>Export your PDF report</b><small>Readable executive summary, evidence references, and limitations</small></button>
  </div>
  <div class="guide-disclaimer"><b>🔒 Your data</b><p>Local processing by default. Cloud mode transmits selected metadata and your questions to the configured AI provider. Do not submit sensitive third-party data without authorization.</p></div>
 </aside>

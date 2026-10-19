@@ -41,3 +41,8 @@ predict_flow(features: dict) -> dict
 ## Security and data governance
 
 Raw captures and packet metadata can contain personal or proprietary information. Use authorized traffic only. Do not commit private PCAPs, API keys, `.env`, stored SQLite case databases, or individual customer metadata to GitHub. 
+
+
+## v1.8 live ML baseline
+
+BLACKBOX now includes **unsupervised Isolation Forest**, accessed from More tools → ML anomaly screening. It fits on *this case's flows*, without labels or remote API calls, using log-scaled counts/rates, ports, TCP flag counts and protocol indicators. At least 24 flows are needed. An outlier is not an attack diagnosis, and a capture dominated by malicious flows can make the comparison unreliable. For a real supervised model, provide independently labeled training data, avoid same-capture leakage and report precision, recall, F1 and false positives on held-out captures.

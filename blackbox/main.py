@@ -1,13 +1,13 @@
 from __future__ import annotations
-import hashlib,os,ipaddress,secrets,base64,hmac,time,json,asyncio,subprocess,sys
+import hashlib,os,ipaddress,secrets,base64,hmac,time,json,asyncio,subprocess,sys,io
 from collections import defaultdict,deque
 from pathlib import Path
 from fastapi import FastAPI,File,UploadFile,HTTPException,Query,Request
-from fastapi.responses import FileResponse,PlainTextResponse,JSONResponse
+from fastapi.responses import FileResponse,PlainTextResponse,JSONResponse,StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel,Field
-from . import storage,accounts,replay,specialists,ml_features,trace
+from . import storage,accounts,replay,specialists,ml_features,ml_anomaly,report_pdf,trace
 from .parser import iter_frames,parse_frame,CaptureError
 from .analyze import recompute
 from .assistant import answer,OLLAMA_URL
@@ -25,7 +25,7 @@ if DEPLOY_MODE in ('public-demo','private-hosted','multi-user') and not os.envir
     raise RuntimeError('Hosted mode requires BLACKBOX_PUBLIC_HOST')
 if DEPLOY_MODE=='public-demo':
     os.environ.pop('BLACKBOX_CLOUD_API_KEY',None)
-app=FastAPI(title='BLACKBOX Investigator',version='1.7.0',docs_url=None if DEPLOY_MODE!='local' else '/api/docs',redoc_url=None)
+app=FastAPI(title='BLACKBOX Investigator',version='1.8.0',docs_url=None if DEPLOY_MODE!='local' else '/api/docs',redoc_url=None)
 REQUESTS=defaultdict(deque)
 AUTH_REQUESTS=defaultdict(deque)
 # Single-process concurrency gate; for scale-out replace SQLite and this gate with a shared job queue.
@@ -155,7 +155,7 @@ async def deployment_guard(request:Request,call_next):
 def index():return FileResponse(ROOT/'static'/'index.html')
 
 @app.get('/api/health')
-def health():return {'ok':True,'version':'1.7.0','mode':DEPLOY_MODE,'ollama_configured':bool(OLLAMA_URL),
+def health():return {'ok':True,'version':'1.8.0','mode':DEPLOY_MODE,'ollama_configured':bool(OLLAMA_URL),
   'cloud_ai':safe_cloud_status() if DEPLOY_MODE!='public-demo' else {'configured':False,'provider':None,'model':None},
   'limits':{'upload_mb':MAX_UPLOAD//(1024*1024),'frames':MAX_FRAMES, 'max_cases_per_user':MAX_CASES_PER_USER, 'max_captures_per_case':MAX_CAPTURES_PER_CASE}}
 
@@ -393,6 +393,26 @@ def export_ml_features(cid:str):
     response.headers['Content-Disposition']='attachment; filename=BLACKBOX-ml-features.csv'
     return response
 
+@app.get('/api/cases/{cid}/ml/anomalies')
+def ml_anomalies(cid:str):
+    """Per-case unsupervised outlier detection; never interprets scores as attack probabilities."""
+    require_case(cid)
+    return ml_anomaly.screen(cid)
+
+@app.get('/api/cases/{cid}/captures/{capid}/download')
+def download_original_capture(cid:str,capid:str):
+    """Retrieve exactly the source file for an authorized case (never from public gallery)."""
+    require_case(cid)
+    if DEPLOY_MODE=='public-demo':raise HTTPException(403,'Original captures cannot be downloaded from public demo.')
+    cap=storage.get_capture(cid,capid)
+    if not cap:raise HTTPException(404,'Capture not found')
+    path=Path(cap['stored_path']).resolve()
+    if not path.is_relative_to(storage.CAPTURES.resolve()) or not path.is_file():
+        raise HTTPException(404,'Original capture unavailable')
+    filename=Path(cap['filename']).name
+    if not filename.lower().endswith(('.pcap','.pcapng','.cap')):filename += '.pcap'
+    return FileResponse(path,media_type='application/octet-stream',filename=filename,content_disposition_type='attachment')
+
 @app.get('/api/cases/{cid}/dns')
 def dns(cid:str,limit:int=Query(250,ge=1,le=1000)):
     require_case(cid);return storage.dns_stats(cid,limit)
@@ -459,6 +479,28 @@ def investigate(cid:str):require_case(cid);return recompute(cid)
 @app.post('/api/cases/{cid}/ask')
 def ask(cid:str,data:ChatIn):require_case(cid);return answer(cid,data.question,data.use_local_model,data.use_cloud_model,history=[{"role":h.get("role"),"content":str(h.get("content",""))[:1100]} for h in data.history if isinstance(h,dict) and h.get("role") in ("user","assistant")][-8:],page=data.page if data.page in ("overview","captures","investigation","replay","findings","traffic","assistant","report") else "assistant")
 
+class AIReportIn(BaseModel):
+    mode:str=Field(pattern='^(cloud|local)$')
+
+@app.post('/api/cases/{cid}/report/ai.pdf')
+def ai_explained_pdf(cid:str,data:AIReportIn):
+    """Explicit opt-in to an LLM. Cloud mode shares bounded case metadata, not raw PCAP."""
+    require_case(cid)
+    if DEPLOY_MODE=='public-demo':raise HTTPException(403,'AI calls disabled in public demo')
+    summary=storage.summary(cid)
+    if not summary['stats']['packet_count']:
+        raise HTTPException(422,'Import packets before requesting an AI-assisted report')
+    question=('Give a concise, readable investigation summary using only verified packet and rule evidence available in this case. '
+              'Explain what was observed, why the findings deserve review, two alternative benign explanations, '
+              'relevant packet IDs, checks an analyst should make next, and unknowns. '
+              'Do not invent packet counts, IPs, confirmed attacks, malware labels, or attacker identities.')
+    result=answer(cid,question,use_local_model=data.mode=='local',use_cloud_model=data.mode=='cloud',page='report')
+    if result.get('engine') not in ('cloud-tool-agent','local-tool-agent'):
+        raise HTTPException(503,'AI model unavailable. Use the evidence-generated PDF instead.')
+    pdf=report_pdf.build(cid,ai_commentary=result['answer'],ai_engine=result['engine'])
+    return StreamingResponse(io.BytesIO(pdf),media_type='application/pdf',
+      headers={'Content-Disposition':f'attachment; filename="BLACKBOX-{cid[:8]}-AI-explained.pdf"'})
+
 @app.get('/api/cases/{cid}/report')
 def report(cid:str,format:str='md'):
     case=require_case(cid);s=storage.summary(cid);fs=storage.list_findings(cid)
@@ -475,7 +517,12 @@ def report(cid:str,format:str='md'):
             'This tool is not a substitute for a full forensic suite or human analyst.'
         ]}
     if format=='json':return report
-    if format!='md':raise HTTPException(422,'format must be md or json')
+    if format=='pdf':
+        pdf=report_pdf.build(cid)
+        return StreamingResponse(io.BytesIO(pdf),media_type='application/pdf',
+            headers={'Content-Disposition':f'attachment; filename="BLACKBOX-{cid[:8]}-investigation.pdf"',
+                     'X-Content-Type-Options':'nosniff'})
+    if format!='md':raise HTTPException(422,'format must be pdf, md or json')
     def esc(v):return str(v).replace('\n',' ').replace('\r',' ')
     lines=[f"# BLACKBOX — {esc(case['name'])}", '',f"Case ID: `{case['id']}`", '',
        f"Packets analyzed: **{s['stats']['packet_count']:,}**  ",f"Observed bytes (packet lengths): **{s['stats']['traffic_bytes']:,}**  ",

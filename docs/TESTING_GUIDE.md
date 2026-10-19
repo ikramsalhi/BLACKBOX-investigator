@@ -43,6 +43,6 @@ python -m pip install -r requirements.txt pytest
 python -m pytest tests -q
 ```
 
-The original v1.7 release had 45 passing Python tests. Re-run the suite and smoke tests locally after the public-safe demo-fixture substitution. The large synthetic stress capture produced nine heuristic findings in release testing. Results are for the current heuristic threshold rules, not ML training accuracy or a real-world false-positive study.
+The updated v1.8 release has 47 passing Python tests, including end-to-end PDF report, saved original PCAP, persistent case history, and unsupervised ML API checks. Re-run the suite and smoke tests locally before deploying. The large synthetic stress capture produced nine heuristic findings in release testing. Results are for the current heuristic threshold rules, not ML training accuracy or a real-world false-positive study.
 
 If a capture is unsupported, check its link-layer type and size. Encrypted traffic payloads are not decrypted, and not every Wireshark dissector is replicated. Inspect exact source frames in Wireshark when needed.

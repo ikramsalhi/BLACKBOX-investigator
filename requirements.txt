@@ -4,3 +4,10 @@ python-multipart>=0.0.9,<1.0
 
 # Used by bundled demo seeder and local validation runner
 httpx>=0.27,<1.0
+
+# Readable PDF reports and unsupervised ML anomaly screening
+reportlab>=4.0,<5
+scikit-learn>=1.3,<2
+
+# PDF text extraction for the report regression tests
+pypdf>=4.0,<7
