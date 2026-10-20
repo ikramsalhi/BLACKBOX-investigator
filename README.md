@@ -1,3 +1,25 @@
+## 🔐 Authentication on Railway (v1.9)
+
+Set `BLACKBOX_DEPLOY_MODE=hybrid` to keep the synthetic gallery public but require username/password sessions for private captures, reports, and case storage. Browser sign-in uses a 12-hour, HttpOnly, Secure, SameSite=Strict session cookie with CSRF protection. Existing HTTP Basic account access remains available in `multi-user` mode.
+
+**Required Railway environment variables** (do not commit values to GitHub):
+
+```text
+BLACKBOX_DEPLOY_MODE=hybrid
+BLACKBOX_PUBLIC_HOST=blackbox-investigator-production.up.railway.app
+BLACKBOX_BOOTSTRAP_USER=<your account username>
+BLACKBOX_BOOTSTRAP_PASSWORD=<your unique 16+ character secret>
+BLACKBOX_SIGNUP_INVITE_CODE=<optional unique 20+ character secret>
+```
+
+The bootstrap account is created **only if it does not exist**. Invitation-based signup is disabled when no `BLACKBOX_SIGNUP_INVITE_CODE` is set. Never give the invitation code to the public. Railway must mount a persistent volume on `/var/lib/blackbox` (otherwise uploaded captures, saved cases and sessions are lost on redeploy). Keep sensitive captures out of the public gallery. Captures are private to each authenticated account.
+
+**Important:** GitHub deployment alone does not change Railway's existing `BLACKBOX_DEPLOY_MODE`; configure the Railway variables before expecting login to appear. In `public-demo` mode, it stays read-only with no sign-in required. In `hybrid` mode the public gallery remains readable; signed-in users can create private cases. Logout revokes the session token. Do not store production secrets, private PCAPs or volume contents in Git.
+
+This is a pilot authentication system (no email verification, password reset or independent penetration test). Avoid uploading sensitive third-party evidence until HTTPS, persistence, backups, network rules, resource limits, and all security policies have been audited.
+
+---
+
 # BLACKBOX — Network Incident Investigator
 
 ![BLACKBOX logo](static/blackbox-cube.png)
