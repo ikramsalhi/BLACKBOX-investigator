@@ -17,7 +17,7 @@ ROOT=Path(__file__).resolve().parent.parent
 MAX_UPLOAD=int(os.environ.get('BLACKBOX_MAX_UPLOAD_MB','100'))*1024*1024
 MAX_FRAMES=int(os.environ.get('BLACKBOX_MAX_FRAMES','350000'))
 DEPLOY_MODE=os.environ.get('BLACKBOX_DEPLOY_MODE','local').lower()
-if DEPLOY_MODE not in ('local','public-demo','private-hosted','multi-user','hybrid'):
+if DEPLOY_MODE not in ('local','local-auth','local-hybrid','public-demo','private-hosted','multi-user','hybrid'):
     raise RuntimeError('Invalid BLACKBOX_DEPLOY_MODE')
 if DEPLOY_MODE=='private-hosted' and (not os.environ.get('BLACKBOX_BASIC_USER') or len(os.environ.get('BLACKBOX_BASIC_PASSWORD',''))<16):
     raise RuntimeError('Private hosting requires BLACKBOX_BASIC_USER and a password of at least 16 characters')
@@ -65,11 +65,13 @@ app.mount('/assets',StaticFiles(directory=ROOT/'static'),name='assets')
 async def deployment_guard(request:Request,call_next):
     path=request.url.path
     method=request.method
+    if DEPLOY_MODE in ('local-auth','local-hybrid') and request.client and request.client.host not in ('127.0.0.1','::1'):
+        return JSONResponse({'detail':'Local authentication is available on loopback only'},status_code=403)
     headers={'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer',
              'Cache-Control':'no-store','X-Permitted-Cross-Domain-Policies':'none','Permissions-Policy':'camera=(), microphone=(), geolocation=()',
              'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Resource-Policy':'same-origin',
              'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"}
-    if DEPLOY_MODE!='local':headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains'
+    if DEPLOY_MODE not in ('local','local-auth','local-hybrid'):headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains'
     def fail(detail,status,extra=None):
         r=JSONResponse({'detail':detail},status_code=status,headers=extra or {})
         r.headers.update(headers)
@@ -97,7 +99,7 @@ async def deployment_guard(request:Request,call_next):
     request.state.csrf=''
     # Both existing Basic accounts and new browser sessions work in multi-user mode.
     # Hybrid allows anonymous READ-ONLY access to synthetic gallery cases.
-    if DEPLOY_MODE in ('multi-user','hybrid'):
+    if DEPLOY_MODE in ('multi-user','hybrid','local-auth','local-hybrid'):
         session=accounts.get_session(request.cookies.get(accounts.SESSION_COOKIE,''))
         if session and session['username'] in accounts.accounts():
             request.state.user=session['username']
@@ -115,10 +117,10 @@ async def deployment_guard(request:Request,call_next):
             except (ValueError,UnicodeError,base64.binascii.Error):pass
         auth_public=path in ('/api/health','/api/auth/session','/api/auth/login','/api/auth/register') or path=='/' or path.startswith('/assets/')
         if not request.state.user:
-            if DEPLOY_MODE=='multi-user' and not auth_public:
+            if DEPLOY_MODE in ('multi-user','local-auth') and not auth_public:
                 if _limited_login(request):return fail('Too many failed logins',429)
                 return fail('Sign in to access your investigations',401)
-            if DEPLOY_MODE=='hybrid' and path.startswith('/api/') and method not in ('GET','HEAD','OPTIONS') and path not in ('/api/auth/login','/api/auth/register'):
+            if DEPLOY_MODE in ('hybrid','local-hybrid') and path.startswith('/api/') and method not in ('GET','HEAD','OPTIONS') and path not in ('/api/auth/login','/api/auth/register'):
                 return fail('Sign in to create private investigations',401)
         if request.state.auth_kind=='cookie' and path.startswith('/api/') and method not in ('GET','HEAD','OPTIONS') and path not in ('/api/auth/login','/api/auth/register'):
             if not hmac.compare_digest(request.headers.get('x-bb-csrf',''),request.state.csrf):
@@ -130,7 +132,7 @@ async def deployment_guard(request:Request,call_next):
             record=storage.get_case(cid)
             if record is None:return fail('Case not found',404)
             owner=record.get('owner')
-            can_read=bool(request.state.user and owner==request.state.user) or (DEPLOY_MODE=='hybrid' and owner=='public-demo' and method in ('GET','HEAD','OPTIONS'))
+            can_read=bool(request.state.user and owner==request.state.user) or (DEPLOY_MODE in ('hybrid','local-hybrid') and owner=='public-demo' and method in ('GET','HEAD','OPTIONS'))
             if not can_read:
                 _audit('case_access_denied',request)
                 return fail('Case not found',404)
@@ -142,13 +144,14 @@ async def deployment_guard(request:Request,call_next):
     # Local mode rejects cross-origin requests. Hosted mode accepts its own HTTPS origin only.
     if path.startswith('/api/') and method not in ('GET','HEAD','OPTIONS'):
         origin=request.headers.get('origin')
-        if DEPLOY_MODE!='local' and not origin:
+        if DEPLOY_MODE not in ('local',) and not origin:
             return fail('Origin required for authenticated write requests',403)
         if origin:
             from urllib.parse import urlsplit
             try:
                 uri=urlsplit(origin)
-                if DEPLOY_MODE=='local':allowed=uri.hostname in ('127.0.0.1','localhost','::1')
+                if DEPLOY_MODE=='local':allowed=uri.scheme=='http' and uri.hostname in ('127.0.0.1','localhost','::1') and uri.port==8765
+                elif DEPLOY_MODE in ('local-auth','local-hybrid'):allowed=uri.scheme=='http' and uri.hostname in ('127.0.0.1','localhost','::1') and uri.port==8765 and not uri.username and not uri.password
                 else:
                     public_host=os.environ.get('BLACKBOX_PUBLIC_HOST','').lower().strip()
                     allowed=bool(public_host) and uri.hostname==public_host and uri.scheme=='https' and uri.port in (None,443) and not uri.username and not uri.password
@@ -174,10 +177,18 @@ async def deployment_guard(request:Request,call_next):
 @app.get('/')
 def index():return FileResponse(ROOT/'static'/'index.html')
 
+def _first_run_setup():
+    """Allow one initial private user from the local browser; not permitted on hosted servers."""
+    return DEPLOY_MODE=='local-hybrid' and not accounts.accounts()
+
+def _invited_registration():
+    return len(os.environ.get('BLACKBOX_SIGNUP_INVITE_CODE','').strip())>=20 and DEPLOY_MODE in ('hybrid','multi-user','local-hybrid')
+
 @app.get('/api/health')
 def health():return {'ok':True,'version':'1.9.0','mode':DEPLOY_MODE,'ollama_configured':bool(OLLAMA_URL),
   'cloud_ai':safe_cloud_status() if DEPLOY_MODE!='public-demo' else {'configured':False,'provider':None,'model':None},
-  'registration_enabled':len(os.environ.get('BLACKBOX_SIGNUP_INVITE_CODE','').strip())>=20 and DEPLOY_MODE in ('hybrid','multi-user'),
+  'registration_enabled':_invited_registration() or _first_run_setup(),
+  'first_run_setup':_first_run_setup(),
   'limits':{'upload_mb':MAX_UPLOAD//(1024*1024),'frames':MAX_FRAMES, 'max_cases_per_user':MAX_CASES_PER_USER, 'max_captures_per_case':MAX_CAPTURES_PER_CASE}}
 
 
@@ -186,7 +197,7 @@ class LoginIn(BaseModel):
     password:str=Field(min_length=1,max_length=256)
 
 class RegisterIn(LoginIn):
-    invite_code:str=Field(min_length=1,max_length=256)
+    invite_code:str=Field(default='',max_length=256)
 
 @app.get('/api/auth/session')
 def auth_status(request:Request):
@@ -194,18 +205,19 @@ def auth_status(request:Request):
             'username':getattr(request.state,'user','') or None,
             'csrf':request.state.csrf if getattr(request.state,'auth_kind','')=='cookie' else None,
             'mode':DEPLOY_MODE,
-            'registration_enabled':len(os.environ.get('BLACKBOX_SIGNUP_INVITE_CODE','').strip())>=20 and DEPLOY_MODE in ('hybrid','multi-user')}
+            'registration_enabled':_invited_registration() or _first_run_setup(),
+            'first_run_setup':_first_run_setup()}
 
 def _set_login_cookie(response,username):
     token,csrf=accounts.create_session(username)
     response=JSONResponse({'authenticated':True,'username':username,'csrf':csrf})
-    response.set_cookie(accounts.SESSION_COOKIE,token,httponly=True,secure=DEPLOY_MODE!='local',
+    response.set_cookie(accounts.SESSION_COOKIE,token,httponly=True,secure=DEPLOY_MODE not in ('local','local-auth','local-hybrid'),
                         samesite='strict',path='/',max_age=accounts.SESSION_LIFETIME_SECONDS)
     return response
 
 @app.post('/api/auth/login')
 def login(data:LoginIn,request:Request):
-    if DEPLOY_MODE not in ('hybrid','multi-user'):
+    if DEPLOY_MODE not in ('hybrid','multi-user','local-auth','local-hybrid'):
         raise HTTPException(403,'Browser login is not enabled for this deployment')
     if _limited_login(request):raise HTTPException(429,'Too many sign-in attempts; retry later')
     if not accounts.verify(data.username,data.password):
@@ -217,12 +229,13 @@ def login(data:LoginIn,request:Request):
 @app.post('/api/auth/register')
 def register(data:RegisterIn,request:Request):
     secret=os.environ.get('BLACKBOX_SIGNUP_INVITE_CODE','').strip()
-    if DEPLOY_MODE not in ('hybrid','multi-user') or not secret:
+    initial_setup=_first_run_setup()
+    if not initial_setup and (DEPLOY_MODE not in ('hybrid','multi-user','local-auth','local-hybrid') or not secret):
         raise HTTPException(403,'Invitation registration is disabled')
     if _limited_login(request):raise HTTPException(429,'Too many registration attempts; retry later')
-    if len(secret)<20 or not hmac.compare_digest(secret,data.invite_code):
+    if not initial_setup and (len(secret)<20 or not hmac.compare_digest(secret,data.invite_code)):
         raise HTTPException(403,'Invalid invitation code')
-    try:accounts.add(data.username,data.password)
+    try:accounts.add(data.username,data.password,first_account_only=initial_setup)
     except ValueError as exc:raise HTTPException(422,str(exc)) from exc
     _audit('register_success',request,data.username)
     return _set_login_cookie(None,data.username)
@@ -231,7 +244,7 @@ def register(data:RegisterIn,request:Request):
 def logout(request:Request):
     accounts.revoke_session(request.cookies.get(accounts.SESSION_COOKIE,''))
     response=JSONResponse({'logged_out':True})
-    response.delete_cookie(accounts.SESSION_COOKIE,path='/',secure=DEPLOY_MODE!='local',httponly=True,samesite='strict')
+    response.delete_cookie(accounts.SESSION_COOKIE,path='/',secure=DEPLOY_MODE not in ('local','local-auth','local-hybrid'),httponly=True,samesite='strict')
     return response
 
 class CaseIn(BaseModel):
@@ -247,18 +260,18 @@ class ChatIn(BaseModel):
 
 @app.get('/api/cases')
 def cases(request:Request):
-    if DEPLOY_MODE=='hybrid':
+    if DEPLOY_MODE in ('hybrid','local-hybrid'):
         public=storage.list_cases('public-demo')
         user=storage.list_cases(request.state.user) if request.state.user else []
         return public+user
-    return storage.list_cases(request.state.user if DEPLOY_MODE=='multi-user' else 'public-demo' if DEPLOY_MODE=='public-demo' else None)
+    return storage.list_cases(request.state.user if DEPLOY_MODE in ('multi-user','local-auth') else 'public-demo' if DEPLOY_MODE=='public-demo' else None)
 
 @app.post('/api/cases',status_code=201)
 def add_case(data:CaseIn,request:Request):
     if not data.name.strip():raise HTTPException(422,'Case name cannot be blank')
-    owner=request.state.user if DEPLOY_MODE in ('multi-user','hybrid') else ''
-    if DEPLOY_MODE in ('multi-user','private-hosted','hybrid'):
-        if storage.count_cases(owner if DEPLOY_MODE in ('multi-user','hybrid') else None)>=MAX_CASES_PER_USER:
+    owner=request.state.user if DEPLOY_MODE in ('multi-user','hybrid','local-auth','local-hybrid') else ''
+    if DEPLOY_MODE in ('multi-user','private-hosted','hybrid','local-auth','local-hybrid'):
+        if storage.count_cases(owner if DEPLOY_MODE in ('multi-user','hybrid','local-auth','local-hybrid') else None)>=MAX_CASES_PER_USER:
             raise HTTPException(429,'Case quota reached; delete unused cases before creating a new one')
     return storage.create_case(data.name,data.description,owner)
 
@@ -289,7 +302,7 @@ async def create_demo(request:Request):
     if DEPLOY_MODE=='public-demo':
         raise HTTPException(403,'Public gallery is read-only; run seed_public_demo.py first.')
     # Avoid creating duplicate cases on every click.
-    existing=storage.list_cases(request.state.user if DEPLOY_MODE in ('multi-user','hybrid') else None)
+    existing=storage.list_cases(request.state.user if DEPLOY_MODE in ('multi-user','hybrid','local-auth','local-hybrid') else None)
     first=None
     for name,description,filename in LAB_CASES:
         found=next((row for row in existing if row.get('name')==name),None)
@@ -300,11 +313,11 @@ async def create_demo(request:Request):
         if not source.is_file():raise HTTPException(503,'Bundled synthetic demo capture unavailable.')
         data=source.read_bytes()
         if len(data)>MAX_UPLOAD:raise HTTPException(413,'Demo capture exceeds upload limit.')
-        case=storage.create_case(name,description,request.state.user if DEPLOY_MODE in ('multi-user','hybrid') else '')
+        case=storage.create_case(name,description,request.state.user if DEPLOY_MODE in ('multi-user','hybrid','local-auth','local-hybrid') else '')
         temp=storage.CAPTURES/(secrets.token_hex(20)+'.capture')
         try:
             temp.write_bytes(data)
-            parse=_parse_in_worker if DEPLOY_MODE in ('private-hosted','multi-user','hybrid') else _parse_and_store
+            parse=_parse_in_worker if DEPLOY_MODE in ('private-hosted','multi-user','hybrid','local-auth','local-hybrid') else _parse_and_store
             await run_in_threadpool(parse,case['id'],filename,temp,hashlib.sha256(data).hexdigest(),len(data))
             if first is None:first=case['id']
         except Exception:
@@ -348,10 +361,10 @@ async def _upload_unlocked(cid,file):
                 size+=len(chunk)
                 if size>MAX_UPLOAD: raise HTTPException(413,f'Capture too large; limit is {MAX_UPLOAD//(1024*1024)} MB')
                 h.update(chunk);f.write(chunk)
-        if DEPLOY_MODE in ('multi-user','private-hosted','hybrid'):
+        if DEPLOY_MODE in ('multi-user','private-hosted','hybrid','local-auth','local-hybrid'):
             obj=storage.get_case(cid)
             if not obj:raise HTTPException(404,'Case not found')
-            quota=storage.capture_usage(cid, obj['owner'] if DEPLOY_MODE in ('multi-user','hybrid') else None)
+            quota=storage.capture_usage(cid, obj['owner'] if DEPLOY_MODE in ('multi-user','hybrid','local-auth','local-hybrid') else None)
             if quota['case_captures']>=MAX_CAPTURES_PER_CASE:
                 raise HTTPException(429,'Capture count quota exceeded for this case')
             if quota['owner_bytes']+size>MAX_USER_DISK_MB*1024*1024:
@@ -486,7 +499,7 @@ def ml_anomalies(cid:str):
 def download_original_capture(cid:str,capid:str):
     """Retrieve exactly the source file for an authorized case (never from public gallery)."""
     require_case(cid)
-    if DEPLOY_MODE=='public-demo' or (DEPLOY_MODE=='hybrid' and storage.get_case(cid)['owner']=='public-demo'):raise HTTPException(403,'Original captures cannot be downloaded from public gallery.')
+    if DEPLOY_MODE=='public-demo' or (DEPLOY_MODE in ('hybrid','local-hybrid') and storage.get_case(cid)['owner']=='public-demo'):raise HTTPException(403,'Original captures cannot be downloaded from public gallery.')
     cap=storage.get_capture(cid,capid)
     if not cap:raise HTTPException(404,'Capture not found')
     path=Path(cap['stored_path']).resolve()

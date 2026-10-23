@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="/assets/trace.css">
 <link rel="stylesheet" href="/assets/blackbox_v18.css">
 <link rel="stylesheet" href="/assets/auth.css">
+<link rel="stylesheet" href="/assets/gateway.css">
 </head><body>
 <div id="app">
  <aside class="sidebar">
@@ -42,6 +43,26 @@
    <footer class="workspace-footer">BLACKBOX · Evidence-first network investigation <span>Human-reviewed conclusions · Version 1.9</span></footer>
  </main>
 </div>
+<div id="gatewayLayer" class="bb-gateway-layer hidden" role="dialog" aria-modal="true" aria-labelledby="gatewayTitle">
+ <div class="bb-gateway-panel">
+  <div class="bb-gateway-brand"><img src="/assets/blackbox-cube-small.png" alt=""/><div><strong>BLACKBOX</strong><small>NETWORK INCIDENT INVESTIGATOR</small></div><span class="bb-gateway-pill">EVIDENCE FIRST · THIRDUNI 2026</span></div>
+  <div class="bb-gateway-glow" aria-hidden="true"></div>
+  <div class="bb-gateway-hero"><div class="bb-gateway-eyebrow">WELCOME TO BLACKBOX / INVESTIGATION WORKSPACE</div>
+   <h1 id="gatewayTitle">Every packet<br/>has a <em>story.</em></h1><p>Investigate network traffic with traceable evidence. Choose how you want to begin.</p>
+  </div>
+  <div class="bb-gateway-options">
+   <section class="bb-gateway-option private"><div class="bb-gateway-symbol">♢</div><div class="bb-gateway-opt-kicker">01 · SECURE WORKSPACE</div>
+    <h2>Private investigator</h2><p>Sign in to upload PCAP files, save your own cases, explore findings, ask the Copilot and export reports.</p>
+    <button id="gatewayPrivate" type="button" class="bb-gateway-private-btn">Sign in to private workspace →</button>
+    <small>Your private investigations are separate from the public gallery.</small></section>
+   <section class="bb-gateway-option demo"><div class="bb-gateway-symbol">▤</div><div class="bb-gateway-opt-kicker">02 · NO ACCOUNT NEEDED</div>
+    <h2>Explore the demo</h2><p>Open synthetic network investigations, explore the command center and TRACE, and follow the evidence.</p>
+    <button id="gatewayDemo" type="button" class="bb-gateway-demo-btn">Enter read-only demo →</button>
+    <small>Generated test traffic · No real intrusion is claimed.</small></section>
+  </div>
+  <footer><span>◈ &nbsp; ANALYZE &nbsp;·&nbsp; CHALLENGE &nbsp;·&nbsp; EXPLAIN</span><button type="button" id="gatewayHelp">How it works →</button></footer>
+ </div>
+</div>
 <div id="authLayer" class="bb-auth-layer hidden" role="dialog" aria-modal="true" aria-labelledby="authHeading">
  <div class="bb-auth-frame">
   <div class="bb-auth-header"><img src="/assets/blackbox-cube-small.png" alt=""/><span>BLACKBOX / PRIVATE WORKSPACE</span><button type="button" id="authClose" aria-label="Return to public demo" hidden>×</button></div>
@@ -52,7 +73,7 @@
   <label id="inviteRow" hidden>INVITATION CODE<input id="authInvite" name="invite_code" type="password" maxlength="256" autocomplete="off"></label>
   <p id="authError" class="bb-auth-error" role="alert" aria-live="polite"></p><button type="submit" id="authSubmit" class="bb-auth-submit">Sign in securely →</button></form>
   <div class="bb-auth-actions"><button type="button" id="authSwitch" hidden>Create an invited account</button><button type="button" id="authExplore">Explore the public demo ↗</button></div>
-  <div class="bb-auth-note">Encrypted transport on HTTPS · Protected session cookie · Case-level access control · Invite-only registration</div>
+  <div class="bb-auth-note">Protected session cookie · Case-level access control · Invite-only registration on hosted deployments</div>
   </div>
  </div>
 </div>

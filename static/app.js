@@ -18,20 +18,23 @@ async function api(path,opt={}){
  if(!r.ok)throw Error(typeof data.detail==='string'?data.detail:JSON.stringify(data.detail));
  return data;
 }
-function isReadOnly(){return state.health?.mode==='public-demo'||(state.health?.mode==='hybrid'&&(!state.auth?.authenticated||state.caseData?.owner==='public-demo'));}
-function mayCreate(){return state.health?.mode!=='public-demo'&&(state.health?.mode!=='hybrid'||Boolean(state.auth?.authenticated));}
+function isGalleryMode(){return ['hybrid','local-hybrid'].includes(state.health?.mode);}
+function isAccountMode(){return ['multi-user','hybrid','local-auth','local-hybrid'].includes(state.health?.mode);}
+function isReadOnly(){return state.health?.mode==='public-demo'||(isGalleryMode()&&(!state.auth?.authenticated||state.caseData?.owner==='public-demo'));}
+function mayCreate(){return state.health?.mode!=='public-demo'&&(!isAccountMode()||Boolean(state.auth?.authenticated));}
 let authRegister=false;
 function showAuth(register=false){
  authRegister=register;
- const hybrid=state.health?.mode==='hybrid';
+ const hybrid=isGalleryMode();
+ const firstRun=Boolean(state.health?.first_run_setup);
  $('#authLayer').classList.remove('hidden');
  $('#authHeading').textContent=register?'Create your investigation account':'Your evidence. Your workspace.';
- $('#authDescription').textContent=register?'Registration requires an invitation code. Your captures and reports will be private to your account.':'Sign in to upload network captures, save investigations and export your reports privately.';
- $('#inviteRow').hidden=!register;
- $('#authInvite').required=register;
+ $('#authDescription').textContent=register?(firstRun?'Create your first private account here. Your captures and reports will stay in your own local workspace.':'Registration requires an invitation code. Your captures and reports will be private to your account.'):'Sign in to upload network captures, save investigations and export your reports privately.';
+ $('#inviteRow').hidden=!register||firstRun;
+ $('#authInvite').required=register&&!firstRun;
  $('#authPassword').autocomplete=register?'new-password':'current-password';
  $('#authSubmit').textContent=register?'Create private account →':'Sign in securely →';
- $('#authSwitch').textContent=register?'Already have an account? Sign in':'Create an invited account';
+ $('#authSwitch').textContent=register?'Already have an account? Sign in':firstRun?'Create your first local account':'Create an invited account';
  $('#authSwitch').hidden=!state.health?.registration_enabled;
  $('#authExplore').hidden=!hybrid;
  $('#authClose').hidden=!hybrid;
@@ -39,18 +42,18 @@ function showAuth(register=false){
  $('#authPassword').value='';$('#authInvite').value='';
  $('#authUsername').focus();
 }
-function closeAuth(){if(state.health?.mode==='hybrid')$('#authLayer').classList.add('hidden')}
+function closeAuth(){if(isGalleryMode()){ $('#authLayer').classList.add('hidden');showGateway();}}
 function displayAccount(){
- const enabled=['multi-user','hybrid'].includes(state.health?.mode);
+ const enabled=isAccountMode();
  $('#accountButton').hidden=!enabled;
  if(enabled)$('#accountButton').textContent=state.auth?.authenticated?'◉ '+state.auth.username+' · Sign out':'🔒 Sign in / Register';
  applyDeploymentMode();
 }
 async function authStartup(){
- if(!['multi-user','hybrid'].includes(state.health?.mode))return;
+ if(!isAccountMode())return;
  state.auth=await api('/auth/session');
  displayAccount();
- if(state.health.mode==='multi-user'&&!state.auth.authenticated)showAuth();
+ if(['multi-user','local-auth'].includes(state.health.mode)&&!state.auth.authenticated)showAuth();
 }
 async function doSignOut(){
  if(!confirm('Sign out of this private workspace?'))return;
@@ -58,24 +61,53 @@ async function doSignOut(){
  state.auth={authenticated:false,username:null,csrf:null};
  state.caseId='';state.caseData=null;state.chat=[];state.packets=[];state.mlLoaded=false;state.mlResults=null;
  await loadCases();displayAccount();
- if(state.health.mode==='multi-user')showAuth();
- else navigate('library');
+ if(['multi-user','local-auth'].includes(state.health.mode))showAuth();
+ else {navigate('library');showGateway();}
  toast('Signed out. Your private evidence remains saved on the server.');
 }
+function showGateway(){
+ if(!isGalleryMode())return;
+ $('#authLayer').classList.add('hidden');
+ $('#gatewayPrivate').textContent=state.auth?.authenticated?'Continue private workspace →':state.health?.first_run_setup?'Create private account →':'Sign in to private workspace →';
+ $('#gatewayLayer').classList.remove('hidden');
+ $('#gatewayPrivate').focus();
+}
+function hideGateway(){$('#gatewayLayer').classList.add('hidden');}
+function privateLogin(){hideGateway();if(state.auth?.authenticated){navigate('library');return;}showAuth(Boolean(state.health?.first_run_setup));}
+async function exploreDemo(){
+ hideGateway();
+ try{
+  if(state.auth?.authenticated){
+   await api('/auth/logout',{method:'POST',body:'{}'});
+   state.auth={authenticated:false,username:null,csrf:null};
+   state.caseId='';state.caseData=null;state.chat=[];state.packets=[];state.mlResults=null;state.mlLoaded=false;
+   displayAccount();
+  }
+  await loadCases();
+  const first=state.cases.find(c=>c.owner==='public-demo');
+  if(first&&state.caseId!==first.id){state.caseId=first.id;$('#caseSelect').value=first.id;await refreshCase();}
+  navigate(first?'overview':'library');
+  if(!first)toast('No demo investigations yet. Launch BLACKBOX from the Windows BAT file.',true);
+ }catch(err){toast(err.message,true);showGateway();}
+}
+$('#gatewayPrivate').addEventListener('click',privateLogin);
+$('#gatewayDemo').addEventListener('click',exploreDemo);
+$('#gatewayHelp').addEventListener('click',()=>{hideGateway();toggleGuide(true)});
 $('#accountButton').addEventListener('click',async()=>{
- try{if(state.auth?.authenticated)await doSignOut();else showAuth();}catch(err){toast(err.message,true)}
+ try{if(state.auth?.authenticated)await doSignOut();else showAuth(Boolean(state.health?.first_run_setup));}catch(err){toast(err.message,true)}
 });
 $('#authClose').addEventListener('click',closeAuth);
-$('#authExplore').addEventListener('click',closeAuth);
+$('#authExplore').addEventListener('click',()=>{$('#authLayer').classList.add('hidden');exploreDemo()});
 $('#authSwitch').addEventListener('click',()=>showAuth(!authRegister));
 $('#authForm').addEventListener('submit',async(e)=>{
  e.preventDefault();const b=$('#authSubmit');b.disabled=true;$('#authError').textContent='';
  try{
   const username=$('#authUsername').value.trim(),password=$('#authPassword').value;
   const payload={username,password};
-  if(authRegister)payload.invite_code=$('#authInvite').value;
+  if(authRegister&&!state.health?.first_run_setup)payload.invite_code=$('#authInvite').value;
   const r=await api(authRegister?'/auth/register':'/auth/login',{method:'POST',body:JSON.stringify(payload)});
   state.auth={authenticated:true,username:r.username,csrf:r.csrf};
+   if(authRegister)state.health=await api('/health');
   $('#authLayer').classList.add('hidden');
   state.caseId='';state.caseData=null;state.chat=[];state.mlLoaded=false;state.mlResults=null;
   await loadCases();displayAccount();navigate('library');
@@ -317,7 +349,7 @@ $('#page').addEventListener('click',async e=>{
 $('#page').addEventListener('change',e=>{if(e.target.id==='modelMode')state.modelMode=e.target.value;if(e.target.id==='replaySeek'){stopReplay();stepReplay(e.target.value)}});
 $('#page').addEventListener('submit',e=>{if(e.target.id==='chatForm'){e.preventDefault();let q=$('#chatInput').value.trim();if(q)ask(q)}});
 $('#page').addEventListener('keydown',e=>{if(e.target.classList?.contains('host')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();state.selectedHost=e.target.dataset.ip;updateInspector()}});
-(async()=>{try{state.health=await api('/health');await authStartup();applyDeploymentMode();if(state.health.mode!=='multi-user'||state.auth?.authenticated)await loadCases()}catch(err){toast('Backend unavailable: '+err.message,true);$('#page').innerHTML='<div class="empty-panel">Could not reach BLACKBOX server. Run python run.py and reload the page.</div>'}})();
+(async()=>{try{state.health=await api('/health');await authStartup();applyDeploymentMode();if(!['multi-user','local-auth'].includes(state.health.mode)||state.auth?.authenticated)await loadCases();if(isGalleryMode())showGateway()}catch(err){toast('Backend unavailable: '+err.message,true);$('#page').innerHTML='<div class="empty-panel">Could not reach BLACKBOX server. Run python run.py and reload the page.</div>'}})();
 
 // Interface guidance, accessible on every view. No third-party JavaScript or assets.
 function toggleGuide(open){$('#guideBackdrop').classList.toggle('hidden',!open);$('#guideDrawer').classList.toggle('hidden',!open);if(open)$('#guideDrawer').focus()}
@@ -332,7 +364,7 @@ function applyDeploymentMode(){
  const readOnly=isReadOnly();
  $('#newCaseBtn').hidden=!mayCreate();
  $('#importTop').hidden=readOnly;
- const labels={'local':'LOCAL WORKSPACE','public-demo':'PUBLIC · READ ONLY','private-hosted':'PRIVATE WORKSPACE','multi-user':'ACCOUNT WORKSPACE','hybrid':state.auth?.authenticated?'PRIVATE + PUBLIC GALLERY':'PUBLIC GALLERY · SIGN IN'};
+ const labels={'local':'LOCAL WORKSPACE','public-demo':'PUBLIC · READ ONLY','private-hosted':'PRIVATE WORKSPACE','multi-user':'ACCOUNT WORKSPACE','local-auth':'LOCAL · SIGN IN','local-hybrid':state.auth?.authenticated?'LOCAL PRIVATE + DEMO':'LOCAL DEMO · SIGN IN','hybrid':state.auth?.authenticated?'PRIVATE + PUBLIC GALLERY':'PUBLIC GALLERY · SIGN IN'};
  $('#modePill').innerHTML=`<span class="pulse-dot"></span> ${html(labels[mode]||'ENGINE ONLINE')}`;
  $('#privacyMode').textContent=readOnly?'LAB PCAP EVIDENCE':'CONTROLLED EVIDENCE ENGINE';
  document.body.classList.toggle('read-only',readOnly);

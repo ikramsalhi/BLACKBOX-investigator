@@ -1,3 +1,11 @@
+## Local Windows login (new optional mode)
+
+To use the real login screen on your own PC, double-click **`START_LOCAL_WITH_LOGIN.bat`** instead of `start_windows.bat`. The first run creates a private local username and password using `create_account.py`; later runs show the Sign In screen directly at `http://127.0.0.1:8765`. The local-auth server is loopback-only, uses an HttpOnly SameSite cookie and CSRF tokens, and never changes Railway configuration.
+
+**Your previous anonymous local cases are not deleted.** They remain in the existing data folder but do not automatically belong to the new account. Run the older `start_windows.bat` for the legacy anonymous workspace; do not run both servers simultaneously. Read `LOCAL_LOGIN_README.txt` for troubleshooting.
+
+---
+
 ## 🔐 Authentication on Railway (v1.9)
 
 Set `BLACKBOX_DEPLOY_MODE=hybrid` to keep the synthetic gallery public but require username/password sessions for private captures, reports, and case storage. Browser sign-in uses a 12-hour, HttpOnly, Secure, SameSite=Strict session cookie with CSRF protection. Existing HTTP Basic account access remains available in `multi-user` mode.

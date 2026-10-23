@@ -1,0 +1,29 @@
+.bb-gateway-layer{position:fixed;inset:0;z-index:8000;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 30% 18%,#23133e,#070b17 65%);color:#f4f1ff;font-family:Inter,"Segoe UI",sans-serif;overflow:auto}
+.bb-gateway-layer.hidden{display:none!important}
+.bb-gateway-panel{position:relative;width:min(1080px,100%);padding:38px 42px 30px;border:1px solid #39405c;border-radius:22px;background:linear-gradient(145deg,#111529,#0b1120 62%,#15102a);box-shadow:0 28px 110px #000a;overflow:hidden}
+.bb-gateway-brand,.bb-gateway-brand>div{display:flex;align-items:center;gap:12px}
+.bb-gateway-brand>div{flex-direction:column;align-items:flex-start;gap:2px}
+.bb-gateway-brand img{width:53px;height:53px;object-fit:contain}
+.bb-gateway-brand strong{font-size:20px;letter-spacing:.17em}
+.bb-gateway-brand small{color:#a4acc8;letter-spacing:.14em;font-size:9px}
+.bb-gateway-pill{margin-left:auto;padding:10px 16px;border:1px solid #594578;border-radius:100px;letter-spacing:.14em;color:#c9acff;font-size:9px}
+.bb-gateway-glow{position:absolute;width:360px;height:360px;right:-70px;top:85px;filter:blur(90px);border-radius:50%;background:#6c31b42a;pointer-events:none}
+.bb-gateway-hero{position:relative;margin:55px 0 34px}
+.bb-gateway-eyebrow,.bb-gateway-opt-kicker{letter-spacing:.18em;font-size:10px;font-weight:700;color:#c1a0ff}
+.bb-gateway-hero h1{font-weight:800;font-size:clamp(42px,7vw,84px);line-height:1.05;letter-spacing:-.05em;margin:14px 0}
+.bb-gateway-hero em{font-style:normal;color:#b98dff}
+.bb-gateway-hero p{font-size:16px;max-width:530px;line-height:1.7;color:#b4bdd6}
+.bb-gateway-options{display:grid;grid-template-columns:1fr 1fr;gap:18px;position:relative}
+.bb-gateway-option{padding:30px;border-radius:16px;border:1px solid #61459a;background:linear-gradient(145deg,#231739,#151526)}
+.bb-gateway-option.demo{border-color:#34576a;background:linear-gradient(145deg,#142538,#111723)}
+.bb-gateway-symbol{font-size:34px;color:#c19dff;margin-bottom:14px}
+.bb-gateway-option.demo .bb-gateway-symbol{color:#65d9d0}
+.bb-gateway-option h2{font-size:25px;letter-spacing:-.02em;margin:11px 0}
+.bb-gateway-option p{min-height:70px;color:#b7c0d7;font-size:13px;line-height:1.7}
+.bb-gateway-option button{width:100%;padding:15px;border:none;border-radius:9px;background:#b999ff;color:#181021;font-size:13px;font-weight:800;cursor:pointer;margin:20px 0 10px}
+.bb-gateway-option.demo button{color:#e7fbff;background:#29485b}
+.bb-gateway-option button:hover{filter:brightness(1.14)}
+.bb-gateway-option small{font-size:11px;color:#8897b2}
+.bb-gateway-panel footer{display:flex;justify-content:space-between;align-items:center;margin-top:28px;color:#9cabc4;font-size:10px;letter-spacing:.12em}
+.bb-gateway-panel footer button{background:none;color:#c9adff;cursor:pointer;border:none}
+@media(max-width:700px){.bb-gateway-panel{padding:22px}.bb-gateway-options{grid-template-columns:1fr}.bb-gateway-hero{margin:32px 0}.bb-gateway-pill{display:none}.bb-gateway-option p{min-height:0}}
