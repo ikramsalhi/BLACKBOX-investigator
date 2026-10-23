@@ -1,138 +1,200 @@
-## Local Windows login (new optional mode)
+<div align="center">
 
-To use the real login screen on your own PC, double-click **`START_LOCAL_WITH_LOGIN.bat`** instead of `start_windows.bat`. The first run creates a private local username and password using `create_account.py`; later runs show the Sign In screen directly at `http://127.0.0.1:8765`. The local-auth server is loopback-only, uses an HttpOnly SameSite cookie and CSRF tokens, and never changes Railway configuration.
+# BLACKBOX
+### Network Incident Investigator
 
-**Your previous anonymous local cases are not deleted.** They remain in the existing data folder but do not automatically belong to the new account. Run the older `start_windows.bat` for the legacy anonymous workspace; do not run both servers simultaneously. Read `LOCAL_LOGIN_README.txt` for troubleshooting.
+**An alert tells you something looks suspicious. BLACKBOX helps you investigate why.**
 
----
+**From raw packets to a story you can verify.**
 
-## 🔐 Authentication on Railway (v1.9)
+[**🚀 Explore the live demo**](https://blackbox-investigator-production.up.railway.app/) · [**📄 Example investigation report**](docs/BLACKBOX_Example_Investigation_Report.pdf) · [**🎤 Thirduni pitch deck**](docs/BLACKBOX_Thirduni_8_Slides_SOLO.pdf)
 
-Set `BLACKBOX_DEPLOY_MODE=hybrid` to keep the synthetic gallery public but require username/password sessions for private captures, reports, and case storage. Browser sign-in uses a 12-hour, HttpOnly, Secure, SameSite=Strict session cookie with CSRF protection. Existing HTTP Basic account access remains available in `multi-user` mode.
+![BLACKBOX black cube logo](static/blackbox-cube.png)
 
-**Required Railway environment variables** (do not commit values to GitHub):
+**PCAP / PCAPNG** · **Evidence-linked findings** · **BLACKBOX TRACE** · **Network visualization** · **Optional AI Copilot** · **PDF reports**
 
-```text
-BLACKBOX_DEPLOY_MODE=hybrid
-BLACKBOX_PUBLIC_HOST=blackbox-investigator-production.up.railway.app
-BLACKBOX_BOOTSTRAP_USER=<your account username>
-BLACKBOX_BOOTSTRAP_PASSWORD=<your unique 16+ character secret>
-BLACKBOX_SIGNUP_INVITE_CODE=<optional unique 20+ character secret>
-```
+*Built as a solo project for Thirduni 2026 by Ikram Salhi — Master's student in Networks and Embedded Systems.*
 
-The bootstrap account is created **only if it does not exist**. Invitation-based signup is disabled when no `BLACKBOX_SIGNUP_INVITE_CODE` is set. Never give the invitation code to the public. Railway must mount a persistent volume on `/var/lib/blackbox` (otherwise uploaded captures, saved cases and sessions are lost on redeploy). Keep sensitive captures out of the public gallery. Captures are private to each authenticated account.
-
-**Important:** GitHub deployment alone does not change Railway's existing `BLACKBOX_DEPLOY_MODE`; configure the Railway variables before expecting login to appear. In `public-demo` mode, it stays read-only with no sign-in required. In `hybrid` mode the public gallery remains readable; signed-in users can create private cases. Logout revokes the session token. Do not store production secrets, private PCAPs or volume contents in Git.
-
-This is a pilot authentication system (no email verification, password reset or independent penetration test). Avoid uploading sensitive third-party evidence until HTTPS, persistence, backups, network rules, resource limits, and all security policies have been audited.
+</div>
 
 ---
 
-# BLACKBOX — Network Incident Investigator
+## 🕵️ The problem
 
-![BLACKBOX logo](static/blackbox-cube.png)
+A security dashboard can raise an alert: **"Possible ARP spoofing."**
 
-**Evidence first. Challenge conclusions. Explain what the packets actually show.**
+But an alert alone does not explain what happened. Which packets triggered it? When did the activity start? Could there be another explanation? What evidence can an analyst actually show?
 
-BLACKBOX is a local-first network-forensics web application built for the Thirduni October 2026 project. It imports PCAP/PCAPNG captures, extracts packet metadata, reconstructs observed connections and timeline windows, raises **heuristic investigation leads**, and links each finding to packet evidence. It supports an offline evidence assistant and optional user-configured AI. It is **not** a live sniffer, independently validated IDS, or a production forensics appliance.
+**BLACKBOX is an evidence-first network investigation workspace.** Upload a packet capture, explore the observed traffic, inspect suspicious patterns, challenge a finding, and turn the investigation into a report.
 
-Created as a **solo project by Ikram Salhi**, a Master’s student in Networks and Embedded Systems. The **Obsidian purple/navy design** and custom black-cube logo are included. This project intentionally starts with real evidence, not fabricated dashboard statistics.
+Its purpose is not to replace a human analyst or declare every anomaly an attack. It is to make packet evidence **easier to investigate, explain, and question**.
 
-**Thirduni solo presentation:** [8-slide PDF](docs/BLACKBOX_Thirduni_8_Slides_SOLO.pdf)
+## ✨ What makes BLACKBOX different?
 
-## Run BLACKBOX on Windows
+**1. The alert is a starting point, not a verdict.** Rules flag possible activity such as a port sweep or inconsistent ARP identities. Findings are leads that need context.
 
-1. Install [Python 3.10+](https://www.python.org/downloads/) and select **Add Python to PATH**.
-2. Download/extract the repository and double-click `start_windows.bat`.
-3. Open **http://127.0.0.1:8765** (opens automatically on most PCs).
-4. Select **Open demo investigations** to load two synthetic lab scenarios, or click **+** to create a case and **Import evidence** to upload another capture.
-5. Follow **Overview → Findings → Network Map → Investigator → Report**. Use **More tools** for Packet Explorer and Incident Replay.
+**2. You can challenge the conclusion.** BLACKBOX TRACE presents competing explanations, missing context, and representative source-frame references, so the investigator can test a claim instead of accepting it.
 
-Linux/macOS: `bash start_linux_mac.sh`. Manual start: `python -m pip install -r requirements.txt && python run.py`.
+**3. The explanations lead back to the capture.** Case metadata includes source files, SHA-256 hashes, timestamps, frame numbers, endpoints, and available protocol details.
 
-## Demo captures and provenance
+**4. AI assists; evidence stays in control.** Three deterministic, read-only specialists organize traffic, threat and timeline evidence. An offline assistant works without an API key; optional configured Ollama or cloud AI can help explain case findings. A generated answer is not proof.
 
-| File | Source | Purpose |
-|---|---|---|
-| `samples/demo_pcaps/SYNTHETIC_01_tcp_sweep.pcap` | Generated synthetic fixture | TCP port-sweep-like traffic |
-| `samples/demo_pcaps/SYNTHETIC_02_arp_conflict.pcap` | Generated synthetic fixture | ARP identity conflict and TRACE competing hypotheses |
-| `samples/demo_pcaps/SYNTHETIC_03_dns_and_dhcp_ports.pcap` | Generated synthetic fixture | DNS and DHCP-port observations |
-| `samples/training/generate_training_pcap.py` | Generator for synthetic stress fixture | Generates 7,861 packet records; nine rule findings in release testing (run script to create the PCAP locally) |
+**5. The entire investigation can be revisited.** Save private cases, inspect packets, compare network relationships, replay recorded time windows, and export human-readable reports.
 
-**All bundled PCAPs are synthetic, not captured from an operational network.** Generate the larger optional stress fixture using `python samples/training/generate_training_pcap.py` before importing it. Course/lab PCAPs with unverified distribution rights are excluded from this public repository. To test actual captures, record traffic with authorization or download separately from the public references in `docs/TESTING_GUIDE.md`. Never claim synthetic alerts are confirmed real attacks.
+> **BLACKBOX principle:** Don't just trust the alert. Follow the evidence.
 
-## Features
+## 🚀 Try it in your browser
 
-- PCAP / PCAPNG ingestion with bounded parsing, local case storage, capture SHA-256, original frame references.
-- Observed packet records, DNS and DHCP statistics, unidirectional conversations, visual network map, and timeline/replay windows.
-- Rule-based evidence findings (possible port sweep, ARP inconsistency, legacy cleartext service, DNS pattern, traffic bursts, etc.). A rule match does **not** prove malicious intent.
-- **BLACKBOX TRACE**: challenge each conclusion, compare competing hypotheses, follow timestamped packet evidence, and export an uncertainty-aware mini-investigation.
-- Readable, multi-page PDF investigation reports with an executive summary, clear evidence links, alternate explanations, SHA-256 provenance and limitations; Markdown and JSON remain available. Optional **AI-enhanced PDF** uses configured Ollama/cloud provider with explicit consent and labels generated interpretations.
-- **Export ML flow features (CSV)** in Evidence Vault; same exported feature set can be reproduced programmatically in `blackbox/ml_features.py`. Training labels are deliberately blank, not guessed.
-- Local Isolation Forest **unsupervised ML flow-anomaly screening** (not a validated supervised attack classifier); three read-only deterministic evidence specialists for traffic, threats and timeline. Optional cloud model or private Ollama for language generation.
-- Persistent SQLite case history and retained original source PCAPs: use **Saved investigations** to reopen cases and **Evidence Vault → Original PCAP** to download. Local workspace plus isolated public read-only gallery deployment mode. Cloud model calls are disabled in public gallery mode.
+**Live application:** https://blackbox-investigator-production.up.railway.app/
 
-## Readable reports, optional AI explanations and saved captures (v1.8)
+On the welcome screen, choose:
 
-- In **Report → Download readable PDF**, generate an evidence-based explanation without an API key. The PDF is written from actual parsed case data and supports multi-page results, hashes, source frames, alternative hypotheses and uncertainty. [Example two-page synthetic-case report](docs/BLACKBOX_Example_Investigation_Report.pdf).
-- **AI-enhanced PDF (opt-in)** asks your configured Ollama or cloud AI model to add an explicitly labeled interpretation. This action is not automatic. In cloud mode only selected case metadata and the question go to the configured provider, never raw PCAP bytes. If the model is unavailable it returns an error rather than pretending offline text was generated by AI. Independently verify the model's statements.
-- **Saved investigations** provides persistent history. Open an older case to re-examine its traffic, findings, TRACE, ML baseline, and report. The case metadata resides in SQLite (`blackbox.sqlite3`), and the original source capture files are retained in `captures/` until you delete them.
-- Default local data directory is **`%USERPROFILE%\.blackbox-investigator`** on Windows, or **`~/.blackbox-investigator`** on Linux/macOS. `BLACKBOX_DATA_DIR` overrides that. A Docker deployment uses `/var/lib/blackbox` in its named `blackbox_data` volume. Back up the data directory/volume if you need long-term recovery. GitHub never stores users' uploaded captures.
-- Case-scoped source downloads are available through **Evidence Vault → Original PCAP** to authorized users. Original-file downloads, upload, write actions, and AI generation are disabled in public read-only demo mode.
+| **Explore Demo** | **Private investigator** |
+| --- | --- |
+| No account needed | Account required |
+| Synthetic PCAP investigation gallery | Your own authorized PCAP/PCAPNG files |
+| Browse findings, TRACE, maps, replay and reports | Create cases, analyze, save and export private investigations |
+| **Read-only** | Available when the hosted login and persistent storage are configured |
 
-## BLACKBOX TRACE — Challenge a finding
+**Try this first (about 60 seconds):**
 
-Open a case containing findings. On **Findings**, choose **◈ Challenge this conclusion** next to any alert. TRACE runs entirely against the selected case's stored evidence and presents:
+1. Click **Explore Demo** and select **DEMO B — ARP identity conflict (synthetic)**.
+2. Open **Findings**. Notice the observed ARP inconsistency.
+3. Click **Challenge this conclusion** to open **BLACKBOX TRACE**.
+4. Compare the possible explanations and inspect the referenced packets.
+5. Visit **Network Map** or **Report** to see the evidence in context.
 
-- The observation and detector indicators, clearly separated from a security verdict.
-- **Two possible interpretations** (for example, ARP spoofing vs. IP failover), neither asserted as true.
-- The next independent check that could distinguish those interpretations.
-- A chronological, **representative sample** of source-frame references; click one for filename, SHA-256, original frame number, timestamp, addresses, flags and available packet metadata.
-- Missing context and explicit uncertainty; **Download TRACE report** (Markdown) or **Export JSON**.
+The question is deliberately more interesting than "Did the tool show an alert?": **does conflicting ARP information mean spoofing, failover, or something else?** BLACKBOX makes that uncertainty visible.
 
-The TRACE endpoint is read-only and also works in the public demo gallery: `GET /api/cases/{case_id}/trace/{finding_id}` or `.../export?format=md`. It does **not** generate new detections, assign a compromise probability, inspect missing packet payloads, or ask an LLM to invent alternative facts. TRACE's two scenario descriptions are rule-specific explanation templates, not trained-ML predictions. All packet IDs are validated against the selected case; reports cite original file hashes and frame IDs. A finding may hold only eight representative packet references even when its threshold was computed over many more frames.
+*The demo traffic is generated for education. It does not document an actual intrusion. Hosted features depend on the current deployment configuration.*
 
-**Suggested 30-second judge demo:** choose the synthetic ARP demo, open the first Finding, click **Challenge this conclusion**, compare spoofing and failover explanations, inspect frame evidence, then download the TRACE summary. No API key needed.
+## 🔎 Explore the investigation workspace
 
-## Machine learning: integrated anomaly screening and future supervised classifier
+| Page / tool | What you can do |
+| --- | --- |
+| **Saved investigations** | Reopen previous cases and their retained evidence |
+| **Overview** | View packet totals, observed hosts, protocol distribution, relationships, and event timeline |
+| **Evidence Vault** | Import authorized PCAP/PCAPNG files, track SHA-256 provenance, download original captures when permitted, and export ML flow features |
+| **Findings** | Review rule-based suspicious patterns and their supporting evidence |
+| **BLACKBOX TRACE** | Challenge a finding with competing hypotheses, missing context, and representative packet references |
+| **Packet Explorer** | Search and filter parsed packet metadata by protocol and inspect individual frames |
+| **Network Map** | Explore **observed** communication relationships (not physical locations) |
+| **Incident Replay** | Step through recorded traffic windows (not a reconstructed or proven attack chain) |
+| **ML anomaly screening** | Use a local **unsupervised Isolation Forest** to highlight case-relative flow outliers |
+| **Investigator** | Ask questions of deterministic evidence specialists, an offline assistant, or an optional configured language model |
+| **Report** | Download an evidence-based PDF, Markdown or JSON; optionally request a labeled AI-enhanced PDF |
 
-After opening a case, choose **Evidence Vault → Export ML flow features (CSV)**. Each row is a **directional five-tuple within a 120-second window**; it includes counts, rates, flags, and up to 12 packet evidence references. `label` and `traffic_category` stay empty because packet captures do not supply attack ground truth. See **`docs/ML_INTEGRATION.md`** for the exact columns, model-training recommendations and integration contract.
+### A real example of the reasoning
 
-**Status:** BLACKBOX v1.8 now has a *working unsupervised Isolation Forest* under **More tools → ML anomaly screening**. It fits a local model on 24+ flows from the currently selected case and highlights case-relative outliers with linked packet references. This is real ML but **NOT** a separately trained, supervised or externally validated attack classifier. No precision/recall figures or calibrated attack probabilities are claimed. A separate Random Forest/neural-network model will require labeled training data, matching feature schema and trustworthy evaluation. Existing security-rule findings remain deterministic.
+**Observation:** several MAC addresses appear for one IP in a generated ARP capture.
 
-## Test & run checks
+**Possible interpretation A:** a device is attempting to impersonate another machine.
 
-```bash
+**Possible interpretation B:** failover, reconfiguration, or another legitimate network event produced the observation.
+
+**What BLACKBOX can do:** show the rule that fired, the packet references, chronology, alternative hypotheses and investigative gaps.
+
+**What BLACKBOX cannot know from that capture alone:** the operator's intent or whether the event was malicious. That requires additional context and independent verification.
+
+## 🧠 How it works
+
+~~~mermaid
+flowchart TD
+    A["PCAP / PCAPNG capture"] --> B["Bounded packet parsing + original file SHA-256"]
+    B --> C["Packet records, directional flows, protocol metadata"]
+    C --> D["Rule-based findings"]
+    C --> E["Network map + timeline + packet explorer"]
+    C --> F["Optional local ML: Isolation Forest"]
+    D --> G["BLACKBOX TRACE: challenge the finding"]
+    D --> H["Traffic / Threat / Timeline evidence specialists"]
+    G --> I["Evidence-based investigation report"]
+    H --> J["Offline assistant / optional LLM"]
+    J --> I
+    E --> I
+~~~
+
+**Under the hood:** Python, FastAPI, SQLite, JavaScript/CSS, PCAP parsing, scikit-learn's Isolation Forest and ReportLab PDF generation. The interface uses BLACKBOX's custom dark navy and violet design.
+
+**Important ML distinction:** Isolation Forest is an **unsupervised outlier detector**, not a separately validated intrusion classifier. It needs at least **24 directional flows** in the selected case. Its outlier scores do **not** represent verified attacks or calibrated compromise probabilities. The exported CSV leaves ground-truth labels blank rather than inventing them. [Read the ML integration notes](docs/ML_INTEGRATION.md).
+
+### AI without inventing evidence
+
+The basic packet analysis, rules, TRACE and readable PDF report work **without a cloud AI key**. Cloud AI is optional and user-configured. When enabled, selected case metadata and the user's question may be sent to that provider; raw PCAP bytes are **not** sent to the LLM by this application. Treat model-generated explanations as hypotheses to review.
+
+## 💻 Run BLACKBOX on Windows
+
+1. Install [Python 3.10 or newer](https://www.python.org/downloads/) and enable **Add Python to PATH**.
+2. Click **Code → Download ZIP** on this repository, then extract it.
+3. Double-click **`start_windows.bat`** and keep its terminal window open.
+4. Your browser opens **http://127.0.0.1:8765**.
+5. Choose **Private investigator** or **Explore Demo**.
+
+The launcher sets up the Python environment, initializes the **synthetic** demo gallery without deleting existing cases, and starts the local server. First-time private users can create their initial account **in the browser** (password: 16+ characters); returning users sign in there. On localhost, the server is restricted to the loopback interface.
+
+**Prefer the command line?**
+
+~~~bash
+git clone https://github.com/ikramsalhi/BLACKBOX-investigator.git
+cd BLACKBOX-investigator
+# Windows: double-click start_windows.bat
+~~~
+
+For Linux/macOS, **`bash start_linux_mac.sh`** runs the original local workspace. Manual start: install **`requirements.txt`** and run **`python run.py`**. These legacy commands start the **anonymous `local` mode**, not the new login/demo welcome flow.
+
+**Your data:** local case data and original captures live under **`%USERPROFILE%\.blackbox-investigator`** (Windows) or **`~/.blackbox-investigator`** (Linux/macOS), unless **`BLACKBOX_DATA_DIR`** overrides it. Previous anonymous cases are not automatically assigned to a newly created account. Back up the data directory before changing modes or deleting anything.
+
+## 🧪 Test evidence and reproducibility
+
+Bundled examples are **synthetic and distributable**, not real-world attack captures:
+
+| Capture | Illustrates |
+| --- | --- |
+| **`SYNTHETIC_01_tcp_sweep.pcap`** | TCP sweep-like traffic |
+| **`SYNTHETIC_02_arp_conflict.pcap`** | Conflicting ARP claims and competing interpretations |
+| **`SYNTHETIC_03_dns_and_dhcp_ports.pcap`** | DNS/DHCP-port observations |
+| **`samples/training/generate_training_pcap.py`** | Optional larger synthetic stress capture generator |
+
+The capture files are in [`samples/demo_pcaps/`](samples/demo_pcaps/). The stress generator creates an additional fixture locally; it is not independently verified intrusion ground truth. No confidential classroom or third-party PCAPs are distributed in this repository.
+
+Run the tests:
+
+~~~bash
 python -m pip install -r requirements.txt pytest
 python -m pytest tests -q
-```
+~~~
 
-The v1.8 application was checked with the three bundled demo PCAPs plus an optional generated synthetic training capture, and its 47-test Python suite. TRACE API and offline desktop/mobile HTML interaction checks also passed; unrestricted live URL browser navigation is disabled in the authoring environment, so repeat the full live test on your PC before deploying. For expected numbers and test walkthroughs, see **`docs/TESTING_GUIDE.md`** (two short guides total in `docs/`).
+See the [testing guide](docs/TESTING_GUIDE.md), the [ML feature contract](docs/ML_INTEGRATION.md), and an [example evidence-based PDF report](docs/BLACKBOX_Example_Investigation_Report.pdf).
 
-## GitHub publishing — existing repository
+## 🔐 Public demo vs private deployment
 
-Destination: **https://github.com/ikramsalhi/BLACKBOX-investigator**
+| Deployment mode | Intended use |
+| --- | --- |
+| **`local-hybrid`** | One-click Windows welcome screen: private account or read-only local demo |
+| **`local`** | Legacy offline-first anonymous workspace |
+| **`public-demo`** | Hosted read-only gallery; no private uploads or cloud AI calls |
+| **`hybrid`** | Hosted public gallery plus signed-in private investigations |
+| **`multi-user`** | Account-required hosted workspace |
 
-1. Clone the existing repository via GitHub Desktop (or `git clone https://github.com/ikramsalhi/BLACKBOX-investigator.git`).
-2. **Back up the old files**, then copy the **contents** of this release folder into the cloned repository root (so `README.md`, `blackbox/`, `static/`, `samples/`, `tests/` are at the top level).
-3. Remove old demo-only files that are no longer part of this release, if appropriate. Inspect every staged file, especially any local captures and any `.env`.
-4. Commit with a descriptive message, e.g., `Release BLACKBOX v1.8 with readable PDFs, case history and ML screening`, then push to `main` through GitHub Desktop. **Never force-push without checking history.**
+For hosted private accounts, use HTTPS, configure **`BLACKBOX_DEPLOY_MODE=hybrid`**, set the allowed public host and bootstrap credentials as **private environment variables**, and attach a persistent volume at **`/var/lib/blackbox`**. Refer to [Railway setup](RAILWAY_AUTH_SETUP.md) for instructions.
 
-`.gitignore` excludes `.env`, databases, credentials, caches, most PCAPs, and local data directories. It explicitly allows only generated synthetic fixtures. **GitHub is not a safe place for secret API keys or private captures.**
+**Security and privacy:** BLACKBOX is a research/educational prototype, **not a certified IDS, live traffic sensor, courtroom-ready forensic product, or independently audited production service**. Session controls and case permissions exist, but production use requires further security review, access-control testing, network hardening, backups, and privacy assessment. Upload only captures you are authorized to analyze; consider whether packet metadata contains personal or sensitive information. Never commit passwords, API keys, private captures, or local database files.
 
-## Public demo / deployment
+## 🎯 Why I built it
 
-The Dockerfile and `compose.yaml` support an isolated **read-only gallery**. Before using them, use a real HTTPS domain and configure `BLACKBOX_PUBLIC_HOST`. The public gallery contains only generated synthetic cases. The bundled `deploy_bootstrap.sh` seeds two synthetic investigations into a new empty volume, then starts the site with writes and cloud AI disabled. This is different from the private localhost app, where case creation and upload are enabled.
+I study **Networks and Embedded Systems** and wanted to create something at the intersection of packet analysis, cybersecurity, and practical investigation. BLACKBOX grew from a question:
 
-```bash
-cp deploy.env.example .env
-# Edit .env: BLACKBOX_PUBLIC_HOST and deployment options
-# docker compose reads the variables from the edited file
-docker compose up --build -d
-```
+**What if a cybersecurity tool did more than flag traffic—what if it helped us understand, verify, and explain the evidence behind an alert?**
 
-The public site is **not automatically published** by this source package. Hosting, HTTPS, data permission checks, and a logged-out browser smoke test are still required before a Thirduni submission.
+That is the idea behind BLACKBOX.
 
-## Ownership & transparency
+Created and integrated as a **solo Thirduni 2026 project by Ikram Salhi**, with AI-assisted development tools used during implementation. The detections, limitations, and reproducibility notes above describe what is actually implemented—not promises of a validated autonomous detection system.
 
-**Solo creator:** Ikram Salhi. Design, integration, network analysis, evidence pipeline, testing, and presentation are the responsibility of the solo entrant. AI coding assistance was used. No open-source license has been granted by this repository unless its owner adds one. Preserve attribution when sharing. 
+**Have a capture and a question? Start with the evidence.**
+
+<div align="center">
+
+**BLACKBOX — Every packet has a story.**
+
+[**Explore the demo ↗**](https://blackbox-investigator-production.up.railway.app/) · [**Read an example report ↗**](docs/BLACKBOX_Example_Investigation_Report.pdf)
+
+</div>
